@@ -1,4 +1,8 @@
-# Spring In Action
+
+
+
+
+# Spring_In_ Act4
 
 ## Chap 4(Security)
 
@@ -368,6 +372,299 @@ auth.ldapAuthentication()
 >
 > 하지만 만약 스프링에 내장된 사용자 스토어가 우리 요구를 충족하지 못할 떄는 우리가 커스텀 사용자 명세 서비스를 생성하고 구성해야 한다.
 
+
+
+#### 사용자 인증의 커스터마이징
+
+```java
+@Entity
+@Data
+@NoArgsConstructor(access= AccessLevel.PRIVATE, force = true)
+/*
+	접근 권한 필드들이 final로 생성되어 있는 경우에는 필드를 초기화 할 수 없기 때문에 
+  생성자를 만들 수 없고 에러가 발생하게 됩니다.
+  이 때는 @NoArgsConstructor(force = true) 옵션을 이용해서 final 필드를 0, false, null 등으로 
+   초기화를 강제로 시켜서 생성자를 만들 수 있습니다.
+   */
+@RequiredArgsConstructor
+public class User implements UserDetails {
+    private static final long serialVersionUID=1L;
+
+    @Id
+    @GeneratedValue(strategy= GenerationType.AUTO)
+    private Long id;
+
+    private final String username;
+    private final String password;
+    private final String fullname;
+    private final String street;
+    private final String city;
+    private final String state;
+    private final String zip;
+    private final String phoneNumber;
+  
+  //해당 메소드는 해당 사용자에게 부여된 권한을 저장한 컬렉션을 반환한다.
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities()
+    {
+        return Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));
+    }
+
+    @Override
+    public boolean isAccountNonExpired()
+    {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked()
+    {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired()
+    {
+        return true;
+    }
+    @Override
+    public boolean isEnabled()
+    {
+        return true;
+    }
+
+}
+```
+
+> User클래스는 UserDetails를 구현하였는데  이로인하여 해당 사용자에게 부여된 권한과 해당사용자 계정을 사용할 수 있는지 여부등을 알려줌.
+
+
+
+
+
+`UserRepository 인터페이스`
+
+```java
+public interface UserRepository extends CrudRepository<User, Long> {
+    User findByUsername(String username); //이 메소드는 사용자 이름 즉 ,id로 user를 찾기위한 메소드이다.
+}
+
+```
+
+3장에서 배웠듯이 JPA는 인터페이스의 구현체를 런타임시 자동으로 생성한다. 
+
+
+
+
+
+이제 UserRepository도 있으니 UserService를 생성해보자
+
+```java
+@Service//서비스의 역할은 Repo를 사용하여 처리하는 역할
+public class UserRepositoryUserDetailsService implements UserDetailsService {
+
+    private UserRepository userRepo;
+
+    @Autowired
+    public UserRepositoryUserDetailsService(UserRepository userRepo)//의존성주입
+    {
+        this.userRepo=userRepo;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) //절대로 null을 반환하지 않는 규칙이 있음.
+            throws UsernameNotFoundException {
+        User user=userRepo.findByUsername(username);//따라서 findByUsername메소드가 null을 반환하면 Exception 발생
+        if(user!=null)
+        {
+            return user;
+        }
+        throw new UsernameNotFoundException(
+                "User "+username+" not found"
+        );
+
+    }
+}
+```
+
+
+
+UserDetailService의 형태
+
+```java
+public interface UserDetailsService {
+    UserDetails loadUserByUsername(String var1) throws UsernameNotFoundException;
+}
+```
+
+Username 즉 id가 있으면 UserDetails 객체를 반환하거나 없으면 UsernameNotFoundException 예외를 발생시킨다.
+
+
+
+이때 다시 커스텀 명세 서비스를 스프링 시큐리티에 구성하는것을 해야한다. 
+
+따라서 
+
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Qualifier("userRepositoryUserDetailsService")
+    @Autowired//의존성 주입
+    private UserDetailsService userDetailsService;//어떻게 UserDetailsService인터페이스를 의존성 주입을 해줄까?
+  																								//우리가 해당 메소드 구현한 UserRepositoryUserDetailsService가 들어옴.
+  
+  	@Bean//리턴값 Spring Container가 관리해줌 
+  	public PasswordEncoder encoder()
+    {
+      return new BCryptPasswordEncoder();
+    }
+  
+  	@Override
+  	protected void configure(AuthenticationManagerBuilder auth) throws Exception
+    {
+      auth
+        .userDetailService(userDetailsService)
+        .passwordEncoder(encoder());
+    }
+```
+
+
+
+
+
+
+
+이제는 DB에 사용자 정보를 저장하는 방법이 필요하다. 따라서 사용자 등록 페이지를 생성하자
+
+RegistrationController//등록 폼을 보여주고 처리한다. 
+
+```java
+@Controller//컴포넌트 자동검생이 되어야한다는것을 알림
+@RequestMapping("/register")
+public class RegistrationController {
+    private UserRepository userRepo;
+    private PasswordEncoder passwordEncoder;
+
+    public RegistrationController(UserRepository userRepo, PasswordEncoder passwordEncoder)
+    {
+        this.userRepo=userRepo;
+        //방금 추가 했던 SecurityConfig 클래스에 추가했던 passwordEncoder과 같은 빈
+        this.passwordEncoder=passwordEncoder;
+    }
+
+    @GetMapping
+    public String registerForm()
+    {
+        return "registration";
+    }
+
+    @PostMapping
+    public String processRegistration(RegistrationForm form)//registration의 폼이 제출되면 이 메소드 작동
+    {
+        userRepo.save(form.toUser(passwordEncoder));
+        return "redirect:/login";
+    }
+}
+```
+
+
+
+`registration.html`
+
+```java
+<form method="POST" th:action="@{/register}" id="registerForm">
+```
+
+> 이를 보면 /register로 들어와서 `registration.html` 을 봐서 그대로 입력을 진행한다. 제출을 하면 다시 `/register` 로 가고 이번에는 POST메소드로 간다. 따라서 processRegistration이 장동하고 여기서 form 의 User를 저장한다.
+
+
+
+`RegistrationForm`
+
+```java
+@Data
+public class RegistrationForm {
+    private String username;
+    private String password;
+    private String fullname;
+    private String street;
+    private String city;
+    private String state;
+    private String zip;
+    private String phone;
+
+    public User toUser(PasswordEncoder passwordEncoder)
+    {
+        return new User(
+                username
+                ,passwordEncoder.encode(password)
+                ,fullname
+                ,street
+                ,city
+                ,state
+                ,zip
+                ,phone
+        );
+    }
+    
+```
+
+
+
+이제 타코 클라우드 애플리케이션의 사용자 등록과 인증 지원이 완성 되었다. 그러나 지금은 애플리케이션을 시작해도 등록 페이지를 볼 수 없다. 
+
+기본적으로 모든 웹 요청은 인증이 필요하기 때문이다. 이 문제를 해결하기 위해 지금부터는 웹 요청의 보안을 처리를 살펴본다.
+
+
+
+
+
+### 웹 요청 보안 처리하기
+
+> 타코를 디자인 하거나 주문하기 전에 사용자를 인증해야 한다. 그러나 홈페이지, 로그인 페이지, 등록페이지는 인증되지 않은 모든 사용자가 사용할 수 있어야 한다. 
+>
+> => 이러한 보안 규칙을 구성하기 위해서는 SecurityConfig 클래스에 다음의 configure(HttpSecurity) 메소드를 오버라이딩 해야한다. 
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception
+{
+  
+}
+```
+
+이 configure() 메서도는 HttpSecurity 객체를 인자로 받는다.  이 객체를 활용 하여 구성할수 있는것은 다음과 같다.
+
+* HTTP 요청 처리를 허용하기 전에 충족되어야 할 특정 보안 조건을 구성한다.
+* 커스텀 로그인 페이지를 구성한다.
+* 사용자가 애플리케이션의 로그아웃을 할 수 있도록 한다.
+* CSRF 공격으로부터 보호하도록 구성한다. 
+
+
+
+처리하기
+
+=> /design과 /order의 요청은 인증된 사용자에게만 해야하고 나머지는 모든 사용자가 허용되어야 한다. 
+
+```java
+@Override
+    protected void configure(HttpSecurity http) throws Exception
+    {
+        http.authorizeRequests()
+                .antMatchers("/design","orders")// /design과 /order의 요청은 
+                .hasRole("ROLE_USER") //ROLE_USER의 권한을 갖는 사용자에게만 허용된다.
+                .antMatchers("/","/**")
+          			.permitAll()//이외의 모든 요청은 모든 사용자에게 허용된다.
+    }
+```
+
+> 순서가 중요하다. `antMatchers()` 에서 지정된 경로의 패턴 일치를 검사하므로 먼저 지정된 보안 규칙이 우선 적으로 처리됨
+
+
+
 __TIP__ 
 
 * 로그인 같은 테스트를 진행할 시 Incognito 모드를 이용하는 것이 좋다. 	
@@ -405,6 +702,44 @@ SpEL
 
 
 
+* Entity란?
+  *  일반적으로 **RDBMS에서 Table을 객체화** 시킨 것으로 보면 된다.
+
+![Screen Shot 2020-09-05 at 7.01.44 PM](/Users/nayeong-yun/Library/Application Support/typora-user-images/Screen Shot 2020-09-05 at 7.01.44 PM.png)
+
+
+
+* Data 어노테이션
+  * ![image-20200905195726463](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200905195726463.png)
+
+
+
+
+
+* `@NoArgsConstructor` 어노테이션
+  * 은 파라미터가 없는 기본 생성자를 생성
+
+
+
+* **@Id**
+
+  primary key를 가지는 변수를 선언하는 것을 뜻한다. @GeneratedValue 어노테이션은 해당 Id 값을
+
+  어떻게 자동으로 생성할지 전략을 선택할 수 있다. 여기서 선택한 전략은 "AUTO"이다.
+
+
+
+
+
+* CrudRepository
+
+  * org.springframework.data.repository.CrudRepository
+
+    CRUD 기능을 제공하는 리파지토리 인터페이스
+
+  * 메소드
+
+    ![image-20200905202612829](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200905202612829.png)
 
 
 
@@ -412,4 +747,23 @@ SpEL
 
 
 
+* remember-me
+  * 이전 로그인 정보를 쿠키나 데이터베이스로 저장한 후 일정기간내에 다시 접근 시 저장된 정보로 자동 로그인이 된다.
 
+* RequiredArgsConstructor 
+
+  *  이 애노테이션은 추가 작업을 필요로 하는 필드에 대한 생성자를 생성하는 애노테이션
+
+  * 초기화 되지 않은 모든 final 필드, @Nonnull 로 되었이는 모든 필드에 대한 생성자 자동으로 생성
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
