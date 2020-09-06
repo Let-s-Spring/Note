@@ -1,7 +1,3 @@
-
-
-
-
 # Spring_In_ Act4
 
 ## Chap 4(Security)
@@ -665,6 +661,217 @@ protected void configure(HttpSecurity http) throws Exception
 
 
 
+
+
+
+
+
+
+`SecurityConfig 보안 구성 클래스의 최종 코드`
+
+```java
+package tacos.security;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import javax.sql.DataSource;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Qualifier("userRepositoryUserDetailsService")
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @Bean//왜 자기 여기에 갑자기 Bean을 해준 것일까?
+         //여기에 Bean을 함으로서 우리가 얻는 이득은 BCryptPasswordEncoder()인스턴스가 애플리케이션 컨텍스트로 부터 주입되어 반환된다.
+         //이렇게 함으로써 우리가 원하는 종류의 PasswordEncoder 빈 객체를 스프링 관리하에 사용할 수 있다.
+    public PasswordEncoder encoder()
+    {
+        return new BCryptPasswordEncoder();
+    }
+
+
+    //로그인 페이지는 뷰만 있어서 매운 간단하 WebConfig에 뷰컨트롤러로 선언해도 충
+    //기본 로그인 페이지를 교체하기 위해 커스텀 로그인 페이지가 있는 경로를 스프링 시큐리티에 알려줘야 함
+    @Override
+    protected void configure(HttpSecurity http) throws Exception
+    {
+        http.authorizeRequests()
+                .antMatchers("/design","orders")
+                .hasRole("ROLE_USER")
+                .antMatchers("/","/**")
+                .permitAll()
+                .and()//인증 구성 코드와 연결, 인증 구성이 끝나서 추가적인 HTTP 구성을 적용할 준비가 되었다는것을 나타낸다.
+                .formLogin()//커스텀 로그인 폼을 구성하기 위해 호출.
+                .loginPage("/login")//커스텀 로그인 페이지의 경로를 지정
+                .and()
+                .logout()
+                .logoutSuccessUrl("/")
+                .and()
+                .csrf();
+        
+    }
+
+    @Override
+    public void configure(AuthenticationManagerBuilder auth) throws Exception
+    {
+
+
+        auth
+        .userDetailsService(userDetailsService)
+        .passwordEncoder(encoder());//비밀번호가 암호화 되어 데이터베이스에 저장될 수 있도록 암호화 해주는것
+        /*
+        auth.inMemoryAuthentication()
+                .withUser("user1")
+                .password("{noop}password1")
+                .authorities("ROLE_USER")
+                .and()
+                .withUser("user2")
+                .password("{noop}password2")
+                .authorities("ROLE_USER");
+
+         */
+
+
+//        auth.jdbcAuthentication().dataSource(dataSource)
+//        .usersByUsernameQuery(
+//                "select username, password, enabled from users "+"where username=?")
+//        .authoritiesByUsernameQuery(
+//                "select username, authority from authorities "+ "where username=?"
+//        )
+//        .passwordEncoder(new NoEncodingPasswordEncoder());
+//        auth.ldapAuthentication()
+//                .userSearchBase("ou=people")//사용자를 검색하기 위한 기준점 쿼리 제공(//따라서 루트부터 검색안함)
+//                .userSearchFilter("(uid={0})")//사용자를 검색하기 위해서
+//                .groupSearchBase("ou=groups")//그룹을 찾기 위한 기준점 쿼기 제공(따라서 루트부터 검색안함)
+//                .groupSearchFilter("member={0}")//그룹을 검색하기 위해서
+//                .passwordCompare()// 비밀번호를 비교하는 방법으로 LDAP 인증을 하고자 할 때
+//                .passwordEncoder(new BCryptPasswordEncoder())
+//                .passwordAttribute("userPasscode")
+//                .contextSource()
+//                .root("dc=tacocloud,dc=com");
+
+//        auth.ldapAuthentication()
+//                .userSearchBase("ou=people")//사용자를 검색하기 위한 기준점 쿼리 제공(//따라서 루트부터 검색안함)
+//                .userSearchFilter("(uid={0})")//사용자를 검색하기 위해서
+//                .groupSearchBase("ou=groups")//그룹을 찾기 위한 기준점 쿼기 제공(따라서 루트부터 검색안함)
+//                .groupSearchFilter("member={0}")//그룹을 검색하기 위해서
+//                .contextSource()
+//                .root("dc=tacocloud,dc=com")
+//                .ldif("classpath:users.ldif")//classpath의 루트에서 users.ldif 파일 찾아서 LDAP 서버로 데이터를 로드하라고 요청
+//                .and()
+//                .passwordCompare()
+//                .passwordEncoder(new BCryptPasswordEncoder())
+//                .passwordAttribute("userPasscode");
+
+    }
+
+}
+
+```
+
+
+
+#### CSRF 공격 방어하기
+
+* 스프링 시큐리티에는 내장된 CSRF 방어기능 존재하며 활성화 되어있음.
+
+* 개발자가 별도로 구성할 필요없이 CSRF 토큰을 넣을 _csrf 라는 이름의 필드를 애플리케이션이 제출하는 폼에 포함시키면 됨.
+
+* _csrf라는 이름의 요청 속성에 넣으면 된다.
+
+* 만일 스프링 MVC의 JSP 태그 라이브러리 또는 Thymeleaf를 스프링 시큐리티 dialect와 함께 사용중이라면 숨김 필드 조차도 자동으로 생성됨
+
+* 예를 들어 Thymeleaf가 숨김필드를 포함하기 위해서는 다음과 같이 th:action 속성만 지정하면 됨
+
+* ```html
+  <form method="post" th:action="@{/login}" id="loginForm"
+  ```
+
+* CSRF 지원은 거의 왠만하면 절대 비활성화 하지말자. (단, REST API서버로 실행되는 애플리케이션의 경우 CSRF를 disable 해야함.)
+
+```java
+.and()
+.csrf()
+.disable()
+```
+
+
+
+
+
+
+
+### 사용자 인지하기
+
+* OrderController에서 주문 폼과 바인딩 되는 Order 객체를 최초 생성할 때 해당 주문을 하는 사용자의 이름과 주소를 주문 폼에 미리 넣을 수 있는것
+* 사용자 주문 데이터를 데이터베이스에 저장할 때 주문이 생성되는 User와 Order를 연관시킬 수 있어야 한다. 
+* DB에서 Order 개체와 User 개체를 연관시키기 위해서는 Order 클래스에 새로운 속성을 추가해야한다.
+
+```java
+@Data
+@Entity
+@Table(name="Taco_Order")
+public class Order implements Serializable  {
+	
+	private static final long serialVersionUID = 1L;
+	......
+  @ManyToOne //한건의 주문이 한명의 사용자에속한다는 것을 나타낸다. 즉, 한명의 사용자는 여러주문을 가질 수 있다.
+	private User user;
+}
+```
+
+
+
+> 즉 한명의 사용자가 여러주문을 가질 수 있는 것이다. 
+
+
+
+사용자가 누구인지 결정하는 방법
+
+* Principal 객체를 컨트롤러 메서드에 주입한다.
+
+  * ```java
+    @PostMapping
+    public String processOrder(@Valid Order order, Errors errors, 
+                               SessionStatus sessionStatus,
+                               Principal principal)
+    {
+      ...
+        User user=userRepository.findByUsername(principal.getName())
+    }
+    ```
+
+    
+
+* Authentication 객체를 컨트롤러 메서드에 주입한다
+
+* SecurityContextHolder를 사용해서 보안 컨텍스트를 얻는다
+
+* @AuthenticationPrincipal 애노테이션을 메서드에 지정한다. 
+
+
+
+
+
+
+
+
+
 __TIP__ 
 
 * 로그인 같은 테스트를 진행할 시 Incognito 모드를 이용하는 것이 좋다. 	
@@ -721,11 +928,35 @@ SpEL
 
 
 
+* RequiredArgsConstructor 
+  *  이 애노테이션은 추가 작업을 필요로 하는 필드에 대한 생성자를 생성하는 애노테이션
+  * 초기화 되지 않은 모든 final 필드, @Nonnull 로 되었이는 모든 필드에 대한 생성자 자동으로 생성
+
+
+
 * **@Id**
 
   primary key를 가지는 변수를 선언하는 것을 뜻한다. @GeneratedValue 어노테이션은 해당 Id 값을
 
   어떻게 자동으로 생성할지 전략을 선택할 수 있다. 여기서 선택한 전략은 "AUTO"이다.
+
+
+
+* @ModelAttribute
+
+  @ModelAttribute 선언 후 자동으로 진행되는 작업들은 다음과 같다.
+
+    
+
+  `@RequestParam`과 비슷한데 1:1로 파라미터를 받을경우는 `@RequestParam`를 사용하고, 도메인이나 오브젝트로 파라미터를 받을 경우는 `@ModelAttribute`으로 받을수 있다. 또한 이 어노테이션을 사용하면 검증(Validation)작업을 추가로 할수 있는데 예로들어 null이라던지, 각 멤버변수마다 valid옵션을 줄수가 있고 여기서 에러가 날 경우 BindException 이 발생한다.
+
+  
+
+  #### Using @ModelAttribute on a method argument
+
+  data binding in Spring MVC,
+
+  a very useful mechanism that saves you from having to parse each form field individually.
 
 
 
@@ -750,20 +981,23 @@ SpEL
 * remember-me
   * 이전 로그인 정보를 쿠키나 데이터베이스로 저장한 후 일정기간내에 다시 접근 시 저장된 정보로 자동 로그인이 된다.
 
-* RequiredArgsConstructor 
 
-  *  이 애노테이션은 추가 작업을 필요로 하는 필드에 대한 생성자를 생성하는 애노테이션
 
-  * 초기화 되지 않은 모든 final 필드, @Nonnull 로 되었이는 모든 필드에 대한 생성자 자동으로 생성
+* CSRF(Cross-Site Request Forgery)
+  * 크로스 사이트 요청 위조
+  * 사용자가 웹사이트에 로그인한 상태에서 악의적인 ㅗㅋ드가 삽입된 페이지를 열면 공격대상이 되는 웹사이트에 자동으로 폼이 제출되고 이사이트는 위조된 공격명령이 믿을 수 있는 사용자로부터 제출된 것으로 판단 되어 공격에 노출됨 
 
-    
 
-    
 
-    
 
-    
 
-    
 
-    
+
+
+
+
+
+
+
+
+
