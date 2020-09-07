@@ -1,4 +1,4 @@
-# Spring_In_ Act4
+Spring_In_ Act4
 
 ## Chap 4(Security)
 
@@ -114,8 +114,6 @@ __![Screen Shot 2020-09-05 at 12.40.56 PM](/Users/nayeong-yun/Library/Applicatio
 
 어떤 사용자 스토어를 구성하든 관계없이 __configure(AuthenticationManagerBuilder auth)__ 이 메소드를 구성해야 한다.
 
-
-
 차례대로 살펴보도록 하자
 
 
@@ -173,6 +171,10 @@ __![Screen Shot 2020-09-05 at 12.40.56 PM](/Users/nayeong-yun/Library/Applicatio
 
 
 
+----
+
+
+
 ### JDBC 기반의 사용자 스토어
 
 ```java
@@ -189,8 +191,6 @@ public void configure(AuthenticationManagerBuilder auth) throws Exception
     }
     
 ```
-
-> 
 
 
 
@@ -291,9 +291,11 @@ public interface PasswordEncoder{
 
 JDBC 기반으로 사용자를 인증하는 법을 알았다. 여기서는 인증이 제대로 되는지 확인하기 위해 비밀번호를 암호화 하지 않았고 이 방법은 테스트할 때만 임시로 사용되는 것이다. 따라서 JDBC기반으로 인증하는 jdbcAuthentication() 이외에 다른 인증 방법을 사용할 것이다. 
 
-그전에 또 다른 사용자 LDAP(Lightweight Directory Access Protocol)를 알아보자
+그전에 또 다른 사용자 LDAP(Lightweight Directory Access Protocol)를 알아보자.
 
 
+
+-----
 
 
 
@@ -661,12 +663,6 @@ protected void configure(HttpSecurity http) throws Exception
 
 
 
-
-
-
-
-
-
 `SecurityConfig 보안 구성 클래스의 최종 코드`
 
 ```java
@@ -882,15 +878,13 @@ __TIP__
 
 
 
-참고자료
+## 참고자료
 
 ![image-20200905140300480](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200905140300480.png)
 
 SpEL
 
 * The Spring Expression Language (SpEL for short) is a powerful expression language that supports querying and manipulating an object graph at runtime.
-
-
 
 * varchar와 varchar2의 차이
 
@@ -905,76 +899,76 @@ SpEL
 * Default Method(PasswordEncoder 다 implement 안해서)
    * 인터페이스는 기능에 대한 선언만 가능하기 때문에, 실제 코드를 구현한 로직은 포함될 수 없습니다. 하지만 자바8에서 이러한 룰을 깨트리는 기능이 나오게 되었는 데, 그것이 Default Method(디펄트 메소드)입니다. 메소드 선언시에 default를 명시하게 되면 인터페이스 내부에서도 코드가 포함된 메소드를 선언 할 수 있습니다. (접근제어자에서 사용하는 default와 같은 키워드 이지만, 접근제어자는 아무것도 명시 하지 않은 접근 제어자를 default라고 하며 인터페이스의 default method는 'default'라는 키워드를 명시해야 합니다.)
 
-
-
-
-
-* Entity란?
+* @ Entity
   *  일반적으로 **RDBMS에서 Table을 객체화** 시킨 것으로 보면 된다.
+  *  Entity 어노테이션을 클래스에 선언하면 그 클래스는 JPA가 관리한다.
+  *  그러므로 DB의 테이블과 Class와 맵핑한다면 반드시 @Entity를 붙여주어야 한다.
+     *  제약사항
+        *  1. 필드에 final, enum, interface, class를 사용할 수 없습니다.
+           2. 생성자중 기본 생성자가 반드시 필요합니다.
+     *  속성
+        *  name : 엔티티 이름을 지정합니다. 기본값으로 클래스 이름을 그대로 사용한다.
 
 ![Screen Shot 2020-09-05 at 7.01.44 PM](/Users/nayeong-yun/Library/Application Support/typora-user-images/Screen Shot 2020-09-05 at 7.01.44 PM.png)
 
 
 
-* Data 어노테이션
+* @ Data
+  
   * ![image-20200905195726463](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200905195726463.png)
+  
+* @Table
 
-
-
-
-
-* `@NoArgsConstructor` 어노테이션
-  * 은 파라미터가 없는 기본 생성자를 생성
-
-
-
-* RequiredArgsConstructor 
-  *  이 애노테이션은 추가 작업을 필요로 하는 필드에 대한 생성자를 생성하는 애노테이션
-  * 초기화 되지 않은 모든 final 필드, @Nonnull 로 되었이는 모든 필드에 대한 생성자 자동으로 생성
-
-
-
-* **@Id**
-
-  primary key를 가지는 변수를 선언하는 것을 뜻한다. @GeneratedValue 어노테이션은 해당 Id 값을
-
-  어떻게 자동으로 생성할지 전략을 선택할 수 있다. 여기서 선택한 전략은 "AUTO"이다.
-
-
-
-* @ModelAttribute
-
-  @ModelAttribute 선언 후 자동으로 진행되는 작업들은 다음과 같다.
-
-    
-
-  `@RequestParam`과 비슷한데 1:1로 파라미터를 받을경우는 `@RequestParam`를 사용하고, 도메인이나 오브젝트로 파라미터를 받을 경우는 `@ModelAttribute`으로 받을수 있다. 또한 이 어노테이션을 사용하면 검증(Validation)작업을 추가로 할수 있는데 예로들어 null이라던지, 각 멤버변수마다 valid옵션을 줄수가 있고 여기서 에러가 날 경우 BindException 이 발생한다.
+  * Table 어노테이션은 맵핑할 테이블을 지정합니다.
+  * @Table의 속성
+    * name : 매핑할 테이블의 이름을 지정합니다.
+    * catalog : DB의 catalog를 맵핑합니다.
+    * schema : DB 스키마와 맵핑합니다.
+    * uniqueConstraint : DDL 쿼리를 작성할 때 제약 조건을 생성합니다.
 
   
 
-  #### Using @ModelAttribute on a method argument
-
-  data binding in Spring MVC,
-
-  a very useful mechanism that saves you from having to parse each form field individually.
+* @NoArgsConstructor
+  * 파라미터가 없는 기본 생성자를 생성한다.
+  * ![image-20200907162653420](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200907162653420.png)
 
 
 
+* @RequiredArgsConstructor 
+  *  생성자를 자동 생성하지만, 필드명 위에 @NonNull로 표기된 경우만 생성자의 매개변수로 받는다. 
+  
+    
+  
+* @ID
+
+  * primary key를 가지는 변수를 선언하는 것을 뜻한다.  
+
+
+
+* @GeneratedValue
+
+  * 해당 Id 값을 어떻게 자동으로 생성할지 전략을 선택하는것. 여기서 선택한 전략은 "AUTO"이다.
+
+    
+
+* @ModelAttribute
+
+  * @ModelAttribute 선언 후 자동으로 진행되는 작업들은 다음과 같다.
+
+    * `@RequestParam`과 비슷한데 1:1로 파라미터를 받을경우는 `@RequestParam`를 사용하고, 도메인이나 오브젝트로 파라미터를 받을 경우는 `@ModelAttribute`으로 받을수 있다. 또한 이 어노테이션을 사용하면 검증(Validation)작업을 추가로 할수 있는데 예로들어 null이라던지, 각 멤버변수마다 valid옵션을 줄수가 있고 여기서 에러가 날 경우 BindException 이 발생한다.
+
+    * Using @ModelAttribute on a method argument data binding in Spring MVC, a very useful mechanism that saves you from having to __parse each form field individually__.
+
+      
 
 
 * CrudRepository
 
-  * org.springframework.data.repository.CrudRepository
-
-    CRUD 기능을 제공하는 리파지토리 인터페이스
+  * org.springframework.data.repository.CrudRepository,CRUD 기능을 제공하는 리파지토리 인터페이스
 
   * 메소드
 
     ![image-20200905202612829](/Users/nayeong-yun/Library/Application Support/typora-user-images/image-20200905202612829.png)
-
-
-
-
 
 
 
